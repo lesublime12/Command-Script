@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="UTF-8">
+		<title>Command Script Interpreter</title>
+		<style>
+			* {background-color: #222; color: #EEE; font-size: 20px; font-family: monospace; margin: 0px; padding: 0px;}
+			#prompt {width: 50vw; height: 50vh;}
+			#console {display: inline-block; vertical-align: top;}
+		</style>
+	</head>
+	<body>
+		<h1>CMDS Interpreter</h1><br><button id="execute">Execute</button> <button id="stop" disabled>Stop</button> <button id="clear">Clear console</button><br><br>
+		<textarea id="prompt"></textarea><div id="console">Console:<br></div><br>
+		<script src="./interpreter.js"></script>
+	</body>
+</html>
