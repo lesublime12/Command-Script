@@ -2,6 +2,11 @@
  *  TODO:
  *   Interpreter:
  *    TODO Precise and formated errors.
+ *    TODO Check if pvstr zvstr nvstr single vstr argument works.
+ *    TODO pzvstr nzvstr
+ *    TODO compare var1 var2|num ; iv_subtract = var1 - var2|num
+ *    TODO pvstr zvstr nvstr pzvstr nzvstr to use iv_subtract
+ *    TODO commands return should write to Console.
  *    command_set: 
  *     TODO Store variable type then check in other commands.
  *   Parser:
@@ -31,7 +36,8 @@ class CMDS {
                 "nvstr": (...a)=>this.command_nvstr(...a), // nvstr [var] [var/vstr] [var/vstr/-] | variable negative vstr
                  "vstr": (...a)=>this.command_vstr(...a), // vstr [var/vstr]...
                  "wait": (...a)=>this.command_wait(...a), // wait [num] | wait milliseconds
-                 "echo": (...a)=>this.command_echo(...a)  // echo [var/str/num]...
+                 "echo": (...a)=>this.command_echo(...a),  // echo [var/str/num]...
+                "clear": (...a)=>this.command_clear(...a)  // clear
         }
 
         this.running = false;
@@ -70,183 +76,179 @@ class CMDS {
         return new Promise(r=>setTimeout(r,ms));
     }
 
+    check_arguments(args, min_length, max_length, allow_types) {
+
+        if (args.length < min_length || args.length > max_length) return true;
+        
+        for (let i = 0, L = args.length; i < args; i++)
+            if (allow_types[i].indexOf(args[i].type) < 0 && i < min_length)
+                return true;
+        
+        return false;
+    }
 
     command_set(args) {
 
-        if (args.length < 2) return this.log("command_set error. (1)\n"), false;
-
         let T_IDENTIFIER = this.enum.parse_types.identifier,
-            T_VSTR = this.enum.parse_types.vstr,
-            T_STRING = this.enum.parse_types.string,
-            T_NUMBER = this.enum.parse_types.number,
-            vars = this.variables;
+            T_VSTR       = this.enum.parse_types.vstr,
+            T_STRING     = this.enum.parse_types.string,
+            T_NUMBER     = this.enum.parse_types.number;
+        if (this.check_arguments(args, 2, 2, [[T_IDENTIFIER],[T_IDENTIFIER,T_VSTR,T_STRING,T_NUMBER]])) return this.log("command_set error. (1)\n"), false;
+        
+        let vars = this.variables
 
-        let arg1 = args[0],
-            arg2 = args[1];
-        if (arg1.type !== T_IDENTIFIER) return this.log("command_set error. (2)\n"), false;
-        if (arg2.type === T_IDENTIFIER) {
+        let val1 = args[0].value,
+            val2 = args[1].value,
+            is_var2 = args[1].type === T_IDENTIFIER;
 
-            if (!vars[arg2.value]) return this.log("command_set error. (3)\n"), false;
-            vars[arg1.value] = vars[arg2.value];
-        }
-        if (arg2.type === T_VSTR || arg2.type === T_STRING || arg2.type === T_NUMBER) vars[arg1.value] = arg2.value;
+        if (is_var2 && vars[val2] === undefined) return this.log("command_set error. (2)\n"), false;
+
+        vars[val1] = is_var2 ? vars[val2] : val2;
 
         return true;
     }
 
     command_increment(args) {
 
-        if (args.length < 1) return this.log("command_increment error. (1)\n"), false;
+        let T_IDENTIFIER = this.enum.parse_types.identifier;
+        if (this.check_arguments(args, 1, 1, [[T_IDENTIFIER]])) return this.log("command_set error. (1)\n"), false;
 
-        let T_IDENTIFIER = this.enum.parse_types.identifier,
-            vars = this.variables;
+        let vars = this.variables;
 
-        let arg = args[0];
-        if (arg.type !== T_IDENTIFIER) return this.log("command_increment error. (2)\n"), false;
-        if (vars[arg.value] === undefined) return this.log("command_increment error. (3)\n"), false;
+        let var1 = args[0].value;
+        if (vars[var1] === undefined) return this.log("command_increment error. (2)\n"), false;
 
-        vars[arg.value]++;
+        vars[var1]++;
+
         return true;
     }
 
     command_add(args) {
 
-        if (args.length < 2) return this.log("command_add error. (1)\n"), false;
-
         let T_IDENTIFIER = this.enum.parse_types.identifier,
-            T_NUMBER = this.enum.parse_types.number,
-            vars = this.variables;
+            T_NUMBER     = this.enum.parse_types.number;
+        if (this.check_arguments(args, 3, 3, [[T_IDENTIFIER],[T_IDENTIFIER],[T_IDENTIFIER,T_NUMBER]])) return this.log("command_add error. (1)\n"), false;
 
-        let arg1 = args[0],
-            arg2 = args[1],
-            arg3 = args[2];
-        let var3 = arg3.type === T_IDENTIFIER;
-        if (arg1.type !== T_IDENTIFIER || arg2.type !== T_IDENTIFIER || (!var3 && arg3.type !== T_NUMBER)) return this.log("command_add error. (2)\n"), false;
+        let vars = this.variables;
 
-        if (        vars[arg1.value] === undefined) return this.log("command_add error. (3)\n"), false;
-        if (        vars[arg2.value] === undefined) return this.log("command_add error. (4)\n"), false;
-        if (var3 && vars[arg3.value] === undefined) return this.log("command_add error. (5)\n"), false;
+        let val1 = args[0].value,
+            val2 = args[1].value,
+            val3 = args[2].value,
+            is_var3 = args[2].type === T_IDENTIFIER;
 
-        vars[arg1.value] = var3 ? vars[arg2.value]+vars[arg3.value] : vars[arg2.value]+arg3.value;
+        if (           vars[val1] === undefined) return this.log("command_add error. (2)\n"), false;
+        if (           vars[val2] === undefined) return this.log("command_add error. (3)\n"), false;
+        if (is_var3 && vars[val3] === undefined) return this.log("command_add error. (4)\n"), false;
+
+        vars[val1] = is_var3 ? vars[val2]+vars[val3] : vars[val2]+val3;
+
         return true;
     }
 
     command_subtract(args) {
 
-        if (args.length < 2) return this.log("command_subtract error. (1)\n"), false;
-
         let T_IDENTIFIER = this.enum.parse_types.identifier,
-            T_NUMBER = this.enum.parse_types.number,
-            vars = this.variables;
+            T_NUMBER     = this.enum.parse_types.number;
+        if (this.check_arguments(args, 3, 3, [[T_IDENTIFIER],[T_IDENTIFIER],[T_IDENTIFIER,T_NUMBER]])) return this.log("command_subtract error. (1)\n"), false;
 
-        let arg1 = args[0],
-            arg2 = args[1],
-            arg3 = args[2];
-        let var3 = arg3.type === T_IDENTIFIER;
-        if (arg1.type !== T_IDENTIFIER || arg2.type !== T_IDENTIFIER || (!var3 && arg3.type !== T_NUMBER)) return this.log("command_subtract error. (2)\n"), false;
+        let vars = this.variables;
 
-        if (        vars[arg1.value] === undefined) return this.log("command_subtract error. (3)\n"), false;
-        if (        vars[arg2.value] === undefined) return this.log("command_subtract error. (4)\n"), false;
-        if (var3 && vars[arg3.value] === undefined) return this.log("command_subtract error. (5)\n"), false;
+        let val1 = args[0].value,
+            val2 = args[1].value,
+            val3 = args[2].value,
+            is_var3 = args[2].type === T_IDENTIFIER;
 
-        vars[arg1.value] = var3 ? vars[arg2.value]-vars[arg3.value] : vars[arg2.value]-arg3.value;
+        if (           vars[val1] === undefined) return this.log("command_subtract error. (2)\n"), false;
+        if (           vars[val2] === undefined) return this.log("command_subtract error. (3)\n"), false;
+        if (is_var3 && vars[val3] === undefined) return this.log("command_subtract error. (4)\n"), false;
+
+        vars[val1] = is_var3 ? vars[val2]-vars[val3] : vars[val2]-val3;
+
         return true;
     }
 
     command_multiply(args) {
 
-        if (args.length < 2) return this.log("command_multiply error. (1)\n"), false;
-
         let T_IDENTIFIER = this.enum.parse_types.identifier,
-            T_NUMBER = this.enum.parse_types.number,
-            vars = this.variables;
+            T_NUMBER     = this.enum.parse_types.number;
+        if (this.check_arguments(args, 3, 3, [[T_IDENTIFIER],[T_IDENTIFIER],[T_IDENTIFIER,T_NUMBER]])) return this.log("command_multiply error. (1)\n"), false;
 
-        let arg1 = args[0],
-            arg2 = args[1],
-            arg3 = args[2];
-        let var3 = arg3.type === T_IDENTIFIER;
-        if (arg1.type !== T_IDENTIFIER || arg2.type !== T_IDENTIFIER || (!var3 && arg3.type !== T_NUMBER)) return this.log("command_multiply error. (2)\n"), false;
+        let vars = this.variables;
 
-        if (        vars[arg1.value] === undefined) return this.log("command_multiply error. (3)\n"), false;
-        if (        vars[arg2.value] === undefined) return this.log("command_multiply error. (4)\n"), false;
-        if (var3 && vars[arg3.value] === undefined) return this.log("command_multiply error. (5)\n"), false;
+        let val1 = args[0].value,
+            val2 = args[1].value,
+            val3 = args[2].value,
+            is_var3 = args[2].type === T_IDENTIFIER;
 
-        vars[arg1.value] = var3 ? vars[arg2.value]-vars[arg3.value] : vars[arg2.value]-arg3.value;
+        if (vars[val1] === undefined) return this.log("command_multiply error. (2)\n"), false;
+        if (vars[val2] === undefined) return this.log("command_multiply error. (3)\n"), false;
+        if (is_var3) if (vars[val3] === undefined) return this.log("command_multiply error. (4)\n"), false;
+
+        vars[val1] = is_var3 ? vars[val2]*vars[val3] : vars[val2]*val3;
+
         return true;
     }
 
     command_pvstr(args, stack) {
 
-        if (args.length < 2) return this.log("command_pvstr error. (1)\n"), false;
-
         let T_IDENTIFIER = this.enum.parse_types.identifier,
-            vars = this.variables;
+			T_VSTR       = this.enum.parse_types.vstr;
+        if (this.check_arguments(args, 2, 3, [[T_IDENTIFIER],[T_IDENTIFIER,T_VSTR],[T_IDENTIFIER,T_VSTR]])) return this.log("command_pvstr error. (1)\n"), false;
+		if (!args[2]) args[2] = {type:T_VSTR,value:[]};
+		
+        let vars = this.variables;
 
-        let arg1 = args[0],
-            arg2 = args[1],
-            arg3 = args[2];
-        if (arg1.type !== T_IDENTIFIER) return this.log("command_pvstr error. (2)\n"), false;
-        if (vars[arg1.value] === undefined) return this.log("command_pvstr error. (3)\n"), false
-        if (arg2.type !== T_IDENTIFIER && !vars[arg2.value] === undefined) return this.log("command_pvstr error. (4)\n"), false
-        if (arg3.type !== T_IDENTIFIER && !vars[arg3.value] === undefined) return this.log("command_pvstr error. (5)\n"), false
+        let val1 = args[0].value,
+			is_var2 = args[1].type === T_IDENTIFIER,
+            is_var3 = args[2].type === T_IDENTIFIER;
+        if (vars[val1] === undefined) return this.log("command_pvstr error. (2)\n"), false;
+        if (is_var2) if (vars[args[1].value] === undefined) return this.log("command_pvstr error. (3)\n"), false;
+        if (is_var3) if (vars[args[2].value] === undefined) return this.log("command_pvstr error. (4)\n"), false;
 
-        if (vars[arg1.value] > 0) {
-
-            this.command_vstr([arg2], stack);
-            return true;
-        }
-
-        this.command_vstr([arg3], stack);
+		this.command_vstr([args[1+!(vars[val1]>0)]], stack);
+		
         return true;
     }
 
     command_zvstr(args, stack) {
 
-        if (args.length < 2) return this.log("command_zvstr error. (1)\n"), false;
-
         let T_IDENTIFIER = this.enum.parse_types.identifier,
-            vars = this.variables;
+			T_VSTR       = this.enum.parse_types.vstr;
+        if (this.check_arguments(args, 2, 3, [[T_IDENTIFIER],[T_IDENTIFIER,T_VSTR],[T_IDENTIFIER,T_VSTR]])) return this.log("command_zvstr error. (1)\n"), false;
+		if (!args[2]) args[2] = {type:T_VSTR,value:[]};
+		
+        let vars = this.variables;
 
-        let arg1 = args[0],
-            arg2 = args[1],
-            arg3 = args[2];
-        if (arg1.type !== T_IDENTIFIER) return this.log("command_zvstr error. (2)\n"), false;
-        if (vars[arg1.value] === undefined) return this.log("command_zvstr error. (3)\n"), false
-        if (arg2.type !== T_IDENTIFIER && !vars[arg2.value] === undefined) return this.log("command_zvstr error. (4)\n"), false
-        if (arg3.type !== T_IDENTIFIER && !vars[arg3.value] === undefined) return this.log("command_zvstr error. (5)\n"), false
+        let val1 = args[0].value,
+			is_var2 = args[1].type === T_IDENTIFIER,
+            is_var3 = args[2].type === T_IDENTIFIER;
+        if (vars[val1] === undefined) return this.log("command_zvstr error. (2)\n"), false;
+        if (is_var2) if (vars[args[1].value] === undefined) return this.log("command_zvstr error. (3)\n"), false;
+        if (is_var3) if (vars[args[2].value] === undefined) return this.log("command_zvstr error. (4)\n"), false;
 
-        if (vars[arg1.value] === 0) {
-
-            this.command_vstr([arg2], stack);
-            return true;
-        }
-
-        this.command_vstr([arg3], stack);
+		this.command_vstr([args[1+!(vars[val1]===0)]], stack);
+		
         return true;
     }
 
     command_nvstr(args, stack) {
 
-        if (args.length < 2) return this.log("command_nvstr error. (1)\n"), false;
-
         let T_IDENTIFIER = this.enum.parse_types.identifier,
-            vars = this.variables;
+			T_VSTR       = this.enum.parse_types.vstr;
+        if (this.check_arguments(args, 2, 3, [[T_IDENTIFIER],[T_IDENTIFIER,T_VSTR],[T_IDENTIFIER,T_VSTR]])) return this.log("command_nvstr error. (1)\n"), false;
+		if (!args[2]) args[2] = {type:T_VSTR,value:[]};
+		
+        let vars = this.variables;
 
-        let arg1 = args[0],
-            arg2 = args[1],
-            arg3 = args[2];
-        if (arg1.type !== T_IDENTIFIER) return this.log("command_nvstr error. (2)\n"), false;
-        if (vars[arg1.value] === undefined) return this.log("command_nvstr error. (3)\n"), false
-        if (arg2.type !== T_IDENTIFIER && !vars[arg2.value] === undefined) return this.log("command_nvstr error. (4)\n"), false
-        if (arg3.type !== T_IDENTIFIER && !vars[arg3.value] === undefined) return this.log("command_nvstr error. (5)\n"), false
+        let val1 = args[0].value,
+			is_var2 = args[1].type === T_IDENTIFIER,
+            is_var3 = args[2].type === T_IDENTIFIER;
+        if (vars[val1] === undefined) return this.log("command_nvstr error. (2)\n"), false;
+        if (is_var2) if (vars[args[1].value] === undefined) return this.log("command_nvstr error. (3)\n"), false;
+        if (is_var3) if (vars[args[2].value] === undefined) return this.log("command_nvstr error. (4)\n"), false;
 
-        if (vars[arg1.value] < 0) {
-
-            this.command_vstr([arg2], stack);
-            return true;
-        }
-
-        this.command_vstr([arg3], stack);
+		this.command_vstr([args[1+!(vars[val1]<0)]], stack);
+		
         return true;
     }
 
@@ -307,7 +309,7 @@ class CMDS {
 
             if (type === T_IDENTIFIER) {
 
-                if (vars[val])  return this.log("command_echo error. (3)\n"), false;
+                if (vars[val] === undefined)  return this.log("command_echo error. (3)\n"), false;
                 string += vars[val];
             }
             if (type === T_STRING) string += val;
@@ -315,6 +317,14 @@ class CMDS {
         }
 
         this.DOMConsole.innerText += string+"\n"; // WARNING \n should not be put by default.
+        return true;
+    }
+
+    command_clear(args) {
+
+        if (args.length > 0) return this.log("command_clear error. (1)\n"), false;
+
+        this.DOMConsole.innerText = "Console:\n"; // WARNING \n should not be put by default.
         return true;
     }
 
@@ -511,23 +521,27 @@ DOMClear = document.getElementById("clear");
 
 const cmds = new CMDS(DOMConsole);
 
-DOMPrompt.value = `set vala 139
+DOMPrompt.value = `set vala 16384
 set valb 4
-set valq 0
-set valr 0
 
 set divr vala
-set divc 0
+set divq 0
+
+set comp 0
 set loop {
  subtract divr divr valb
- subtract divc divr valb
- increment valq
- pvstr divc loop {
-  set valr divr
+ subtract comp divr valb
+ increment divq
+ pvstr comp loop {
+  subtract comp divr valb
+  zvstr comp {
+   subtract divr divr valb
+   increment divq
+  }
  }
 }
 vstr loop
-echo vala"/"valb"="valq" (+"divr")"`;
+echo vala"/"valb"="divq" (+"divr")"`;
 DOMExecute.addEventListener("click", async e=>{
 
     DOMExecute.setAttribute("disabled", true);
