@@ -12,13 +12,9 @@
  *   Parser:
  *    TODO Precise and formated errors.
  *   Lexer:
- *      TODO Identifier [a-zA-Z0-9_]
- *       TODO Backslash in string.
- *      TODO Literal floating point numbers.
- *       TODO Literal negative numbers.
- *       TODO Literal byte numbers.
- *       TODO Literal hexadecimal numbers.
- *       TODO Comments (# this is a comment)
+ *      TODO Literal byte numbers.
+ *      TODO Literal hexadecimal numbers.
+ *      TODO Comments (# this is a comment)
  */
 
 class CMDS {
@@ -41,6 +37,7 @@ class CMDS {
         }
 
         this.running = false;
+        this.cmd_stack = [];
         this.variables = {};
         this.DOMConsole = DOMConsole;
 
@@ -65,6 +62,7 @@ class CMDS {
     }
 
     reset() {
+        this.cmd_stack.length = 0;
         for (let name of Object.keys(this.variables)) this.variables[name] = undefined;
     }
 
@@ -86,6 +84,7 @@ class CMDS {
         
         return false;
     }
+
 
     command_set(args) {
 
@@ -252,28 +251,28 @@ class CMDS {
         return true;
     }
 
-    command_vstr(args, stack) {
+    command_vstr(args) {
 
         if (args.length < 1) return this.log("command_vstr error. (1)\n"), false;
 
         let T_IDENTIFIER = this.enum.parse_types.identifier,
-            T_VSTR = this.enum.parse_types.vstr,
+            T_VSTR       = this.enum.parse_types.vstr,
             vars = this.variables;
         for (let i = args.length-1; i >= 0; i--) {
 
-            let arg = args[i],
-                type = arg.type,
-                val = arg.value;
+            let type = args[i].type,
+                value = args[i].value;
             if (type !== T_IDENTIFIER && type !== T_VSTR) return this.log("command_vstr error. (2)\n"), false;
 
-            if (type === T_VSTR)
-                for (let i = val.length-1; i >= 0; i--) stack.push(val[i]);
-            if (type === T_IDENTIFIER) {
+            if (type === T_VSTR) {
 
-                if (!vars[val]) return this.log("command_vstr error. (3)\n"), false;
-
-                for (let i = vars[val].length-1; i >= 0; i--) stack.push(vars[val][i]);
+                for (let i = value.length-1; i >= 0; i--) this.cmd_stack.push(value[i]);
+                return true;
             }
+
+            if (type === T_IDENTIFIER && vars[value] === undefined) return this.log("command_vstr error. (3)\n"), false; // Undefined variable
+
+            for (let i = vars[value].length-1; i >= 0; i--) this.cmd_stack.push(vars[value][i]);
 
             return true;
         }
@@ -295,8 +294,8 @@ class CMDS {
         if (args.length < 1) return this.log("command_echo error. (1)\n"), false;
 
         let T_IDENTIFIER = this.enum.parse_types.identifier,
-            T_STRING = this.enum.parse_types.string,
-            T_NUMBER = this.enum.parse_types.number,
+            T_STRING     = this.enum.parse_types.string,
+            T_NUMBER     = this.enum.parse_types.number,
             vars = this.variables;
 
         let string = "";
@@ -339,8 +338,10 @@ class CMDS {
 
         this.reset();
 
-        let stack = [];
-        for (let i = tree.length-1; i >= 0; i--) stack.push(tree[i]);
+        for (let i = tree.length-1; i >= 0; i--) this.cmd_stack.push(tree[i]);
+
+        tokens = undefined;
+        tree = undefined;
 
         this.running = true;
 
@@ -348,17 +349,13 @@ class CMDS {
         let iterations = 1;
         for (; this.running; iterations++) {
 
-            let curr = stack.pop();
+            let curr = this.cmd_stack.pop();
             if (!curr) {
                 this.running = false;
                 break;
             }
 
-            let ret = await this.commands[curr.name](curr.args, stack);
-            if (!ret) {
-                this.running = false;
-                break;
-            }
+            this.running = !((await this.commands[curr.name](curr.args)) === false);
         }
 
         let end = Date.now();
@@ -371,16 +368,16 @@ class CMDS {
 
         const TT_COMMAND = this.enum.token_types.command,
               TT_IDENTIFIER = this.enum.token_types.identifier,
-              TT_NUMBER = this.enum.token_types.number,
-              TT_STRING = this.enum.token_types.string,
               TT_BRACKET_OPEN = this.enum.token_types.bracket_open,
               TT_BRACKET_CLOSE = this.enum.token_types.bracket_close,
+              TT_STRING = this.enum.token_types.string,
+              TT_NUMBER = this.enum.token_types.number,
               TT_EOL = this.enum.token_types.end_of_line;
 
         const T_IDENTIFIER = this.enum.parse_types.identifier,
               T_VSTR = this.enum.parse_types.vstr,
               T_STRING = this.enum.parse_types.string,
-                T_NUMBER = this.enum.parse_types.number;
+              T_NUMBER = this.enum.parse_types.number;
 
         let tree = [];
         for (let i = 0, L = tokens.length; i < L; i++) {
@@ -476,7 +473,7 @@ class CMDS {
             if (curr > 64 && curr < 91 || curr > 96 && curr < 123) { // COMMAND / IDENTIFIER
 
                 let string = "";
-                for (; i < L && ((buffer[i] > 64 && buffer[i] < 91) || (buffer[i] > 96 && buffer[i] < 123) || (buffer[i] > 47 && buffer[i] < 58)); string+=str[i],i++);
+                for (; i < L && ((buffer[i] > 64 && buffer[i] < 91) || (buffer[i] > 96 && buffer[i] < 123) || (buffer[i] > 47 && buffer[i] < 58) || buffer[i] === 95); string+=str[i],i++);
                 i--;
 
                 if (commands[string.toLowerCase()]) {
@@ -491,18 +488,32 @@ class CMDS {
 
             if (curr === 34) { // STRING
 
+                let backslash = false;
                 let string = "";
-                for (i++; i < L && buffer[i] !== 34; string+=str[i],i++);
-
+                for (i++; i < L && (buffer[i] !== 34 || backslash); i++)
+                    string += backslash && buffer[i] === 110 ? "\n" : (backslash = buffer[i] === 92) ? "" : str[i];
+                
                 tokens.push({type:TT_STRING,value:string});
                 continue;
             }
 
-            if (curr > 47 && curr < 58) { // NUMBER
-
+            if (curr > 47 && curr < 58 || curr === 45 || curr === 46) { // NUMBER
+                
+                let sign = false;
+                let point = curr === 46;
                 let string = "";
-                for (; i < L && (buffer[i] > 47 && buffer[i] < 58); string+=str[i],i++);
+                for (; i < L && (buffer[i] > 47 && buffer[i] < 58 || buffer[i] === 45 || buffer[i] === 46); i++) {
+                    
+                    if (buffer[i] === 45 && sign) return console.log("lexer error number sign"), false;
+                    sign ||= curr === 45;
+
+                    if (buffer[i] === 46 && point) return console.log("lexer error number point"), false;
+                    point ||= buffer[i] === 46;
+
+                    string += str[i];
+                }
                 i--;
+                console.log(string, point);
 
                 tokens.push({type:TT_NUMBER,value:string});
                 continue;
