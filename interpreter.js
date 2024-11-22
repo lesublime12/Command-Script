@@ -2,19 +2,17 @@
  *  TODO:
  *   Interpreter:
  *    TODO Precise and formated errors.
- *    TODO Check if pvstr zvstr nvstr single vstr argument works.
- *    TODO pzvstr nzvstr
- *    TODO compare var1 var2|num ; iv_subtract = var1 - var2|num
- *    TODO pvstr zvstr nvstr pzvstr nzvstr to use iv_subtract
+ *    TODO rename pvstr=gvstr svstr=lvstr zvstr=evstr etc
+ *    TODO protect interpreter variables at parse time.
  *    TODO commands return should write to Console.
- *    command_set: 
+ *    command_set:
  *     TODO Store variable type then check in other commands.
  *   Parser:
  *    TODO Precise and formated errors.
  *   Lexer:
- *      TODO Literal byte numbers.
- *      TODO Literal hexadecimal numbers.
- *      TODO Comments (# this is a comment)
+ *      TODO Literal byte numbers : 21h (0x33) -> '!'
+ *      TODO Literal hexadecimal numbers : 0x33
+ *      TODO Comments  : # this is a comment
  */
 
 class CMDS {
@@ -27,9 +25,12 @@ class CMDS {
                   "add": (...a)=>this.command_add(...a), // add [var] [var] [var/num]
              "subtract": (...a)=>this.command_subtract(...a), // sub [var] [var] [var/num]
              "multiply": (...a)=>this.command_multiply(...a), // mul [var] [var] [var/num]
+              "compare": (...a)=>this.command_compare(...a), // compare [var] [var/num]
                 "pvstr": (...a)=>this.command_pvstr(...a), // pvstr [var] [var/vstr] [var/vstr/-] | variable positive vstr
+               "pzvstr": (...a)=>this.command_pzvstr(...a), // pzvstr [var] [var/vstr] [var/vstr/-] | variable positive or zero vstr
                 "zvstr": (...a)=>this.command_zvstr(...a), // zvstr [var] [var/vstr] [var/vstr/-] | variable zero vstr
-                "nvstr": (...a)=>this.command_nvstr(...a), // nvstr [var] [var/vstr] [var/vstr/-] | variable negative vstr
+               "szvstr": (...a)=>this.command_szvstr(...a), // szvstr [var] [var/vstr] [var/vstr/-] | variable negative or zero vstr
+                "svstr": (...a)=>this.command_svstr(...a), // svstr [var] [var/vstr] [var/vstr/-] | variable negative vstr
                  "vstr": (...a)=>this.command_vstr(...a), // vstr [var/vstr]...
                  "wait": (...a)=>this.command_wait(...a), // wait [num] | wait milliseconds
                  "echo": (...a)=>this.command_echo(...a),  // echo [var/str/num]...
@@ -41,8 +42,11 @@ class CMDS {
         this.variables = {};
         this.DOMConsole = DOMConsole;
 
+        this.variables.iv_compare = 0;
+
         this.enum = {};
         this.enum.commands = Object.fromEntries(Object.keys(this.commands).map(v=>[v,1]));
+        this.enum.interpreter_variables = Object.fromEntries(Object.keys(this.variables).map(v=>[v,1]));
 
         this.enum.token_types = {};
         this.enum.token_types.command = 1,
@@ -77,11 +81,11 @@ class CMDS {
     check_arguments(args, min_length, max_length, allow_types) {
 
         if (args.length < min_length || args.length > max_length) return true;
-        
+
         for (let i = 0, L = args.length; i < args; i++)
             if (allow_types[i].indexOf(args[i].type) < 0 && i < min_length)
                 return true;
-        
+
         return false;
     }
 
@@ -93,8 +97,8 @@ class CMDS {
             T_STRING     = this.enum.parse_types.string,
             T_NUMBER     = this.enum.parse_types.number;
         if (this.check_arguments(args, 2, 2, [[T_IDENTIFIER],[T_IDENTIFIER,T_VSTR,T_STRING,T_NUMBER]])) return this.log("command_set error. (1)\n"), false;
-        
-        let vars = this.variables
+
+        let vars = this.variables;
 
         let val1 = args[0].value,
             val2 = args[1].value,
@@ -188,67 +192,109 @@ class CMDS {
         return true;
     }
 
-    command_pvstr(args, stack) {
+    command_compare(args) {
 
         let T_IDENTIFIER = this.enum.parse_types.identifier,
-			T_VSTR       = this.enum.parse_types.vstr;
-        if (this.check_arguments(args, 2, 3, [[T_IDENTIFIER],[T_IDENTIFIER,T_VSTR],[T_IDENTIFIER,T_VSTR]])) return this.log("command_pvstr error. (1)\n"), false;
-		if (!args[2]) args[2] = {type:T_VSTR,value:[]};
-		
+            T_NUMBER     = this.enum.parse_types.number;
+        if (this.check_arguments(args, 2, 2, [[T_IDENTIFIER],[T_IDENTIFIER,T_NUMBER]])) return this.log("command_compare error. (1)\n"), false;
+
         let vars = this.variables;
 
         let val1 = args[0].value,
-			is_var2 = args[1].type === T_IDENTIFIER,
-            is_var3 = args[2].type === T_IDENTIFIER;
-        if (vars[val1] === undefined) return this.log("command_pvstr error. (2)\n"), false;
+            val2 = args[1].value,
+            is_var2 = args[1].type === T_IDENTIFIER;
+
+        if (           vars[val1] === undefined) return this.log("command_compare error. (2)\n"), false;
+        if (is_var2 && vars[val2] === undefined) return this.log("command_compare error. (3)\n"), false;
+
+        vars.iv_compare = is_var2 ? vars[val1]-vars[val2] : vars[val1]-val2;
+
+        return true;
+    }
+
+    command_pvstr(args) {
+
+        let T_IDENTIFIER = this.enum.parse_types.identifier,
+            T_VSTR       = this.enum.parse_types.vstr;
+        if (this.check_arguments(args, 1, 2, [[T_IDENTIFIER,T_VSTR],[T_IDENTIFIER,T_VSTR]])) return this.log("command_pvstr error. (1)\n"), false;
+        if (!args[1]) args[1] = {type:T_VSTR,value:[]};
+
+        let vars = this.variables;
+
+        let is_var1 = args[0].type === T_IDENTIFIER,
+            is_var2 = args[1].type === T_IDENTIFIER;
+        if (is_var1) if (vars[args[0].value] === undefined) return this.log("command_pvstr error. (2)\n"), false;
         if (is_var2) if (vars[args[1].value] === undefined) return this.log("command_pvstr error. (3)\n"), false;
-        if (is_var3) if (vars[args[2].value] === undefined) return this.log("command_pvstr error. (4)\n"), false;
 
-		this.command_vstr([args[1+!(vars[val1]>0)]], stack);
-		
-        return true;
+        return this.command_vstr([args[+!(vars.iv_compare>0)]]);
     }
 
-    command_zvstr(args, stack) {
+    command_pzvstr(args) {
 
         let T_IDENTIFIER = this.enum.parse_types.identifier,
-			T_VSTR       = this.enum.parse_types.vstr;
-        if (this.check_arguments(args, 2, 3, [[T_IDENTIFIER],[T_IDENTIFIER,T_VSTR],[T_IDENTIFIER,T_VSTR]])) return this.log("command_zvstr error. (1)\n"), false;
-		if (!args[2]) args[2] = {type:T_VSTR,value:[]};
-		
+            T_VSTR       = this.enum.parse_types.vstr;
+        if (this.check_arguments(args, 1, 2, [[T_IDENTIFIER,T_VSTR],[T_IDENTIFIER,T_VSTR]])) return this.log("command_pzvstr error. (1)\n"), false;
+        if (!args[1]) args[1] = {type:T_VSTR,value:[]};
+
         let vars = this.variables;
 
-        let val1 = args[0].value,
-			is_var2 = args[1].type === T_IDENTIFIER,
-            is_var3 = args[2].type === T_IDENTIFIER;
-        if (vars[val1] === undefined) return this.log("command_zvstr error. (2)\n"), false;
+        let is_var1 = args[0].type === T_IDENTIFIER,
+            is_var2 = args[1].type === T_IDENTIFIER;
+        if (is_var1) if (vars[args[0].value] === undefined) return this.log("command_pzvstr error. (2)\n"), false;
+        if (is_var2) if (vars[args[1].value] === undefined) return this.log("command_pzvstr error. (3)\n"), false;
+
+        return this.command_vstr([args[+!(vars.iv_compare>=0)]]);
+    }
+
+    command_zvstr(args) {
+
+        let T_IDENTIFIER = this.enum.parse_types.identifier,
+            T_VSTR       = this.enum.parse_types.vstr;
+        if (this.check_arguments(args, 1, 2, [[T_IDENTIFIER,T_VSTR],[T_IDENTIFIER,T_VSTR]])) return this.log("command_zvstr error. (1)\n"), false;
+        if (!args[1]) args[1] = {type:T_VSTR,value:[]};
+
+        let vars = this.variables;
+
+        let is_var1 = args[0].type === T_IDENTIFIER,
+            is_var2 = args[1].type === T_IDENTIFIER;
+        if (is_var1) if (vars[args[0].value] === undefined) return this.log("command_zvstr error. (2)\n"), false;
         if (is_var2) if (vars[args[1].value] === undefined) return this.log("command_zvstr error. (3)\n"), false;
-        if (is_var3) if (vars[args[2].value] === undefined) return this.log("command_zvstr error. (4)\n"), false;
 
-		this.command_vstr([args[1+!(vars[val1]===0)]], stack);
-		
-        return true;
+        return this.command_vstr([args[+!(vars.iv_compare==0)]]);
     }
 
-    command_nvstr(args, stack) {
+    command_szvstr(args) {
 
         let T_IDENTIFIER = this.enum.parse_types.identifier,
-			T_VSTR       = this.enum.parse_types.vstr;
-        if (this.check_arguments(args, 2, 3, [[T_IDENTIFIER],[T_IDENTIFIER,T_VSTR],[T_IDENTIFIER,T_VSTR]])) return this.log("command_nvstr error. (1)\n"), false;
-		if (!args[2]) args[2] = {type:T_VSTR,value:[]};
-		
+            T_VSTR       = this.enum.parse_types.vstr;
+        if (this.check_arguments(args, 1, 2, [[T_IDENTIFIER,T_VSTR],[T_IDENTIFIER,T_VSTR]])) return this.log("command_szvstr error. (1)\n"), false;
+        if (!args[1]) args[1] = {type:T_VSTR,value:[]};
+
         let vars = this.variables;
 
-        let val1 = args[0].value,
-			is_var2 = args[1].type === T_IDENTIFIER,
-            is_var3 = args[2].type === T_IDENTIFIER;
-        if (vars[val1] === undefined) return this.log("command_nvstr error. (2)\n"), false;
-        if (is_var2) if (vars[args[1].value] === undefined) return this.log("command_nvstr error. (3)\n"), false;
-        if (is_var3) if (vars[args[2].value] === undefined) return this.log("command_nvstr error. (4)\n"), false;
+        let is_var1 = args[0].type === T_IDENTIFIER,
+            is_var2 = args[1].type === T_IDENTIFIER;
+        if (is_var1) if (vars[args[0].value] === undefined) return this.log("command_szvstr error. (2)\n"), false;
+        if (is_var2) if (vars[args[1].value] === undefined) return this.log("command_szvstr error. (3)\n"), false;
 
-		this.command_vstr([args[1+!(vars[val1]<0)]], stack);
-		
-        return true;
+        return this.command_vstr([args[+!(vars.iv_compare<=0)]]);
+    }
+
+    command_svstr(args) {
+
+        let T_IDENTIFIER = this.enum.parse_types.identifier,
+            T_VSTR       = this.enum.parse_types.vstr;
+        if (this.check_arguments(args, 1, 2, [[T_IDENTIFIER,T_VSTR],[T_IDENTIFIER,T_VSTR]])) return this.log("command_svstr error. (1)\n"), false;
+        if (!args[1]) args[1] = {type:T_VSTR,value:[]};
+
+        let vars = this.variables;
+
+        let is_var1 = args[0].type === T_IDENTIFIER,
+            is_var2 = args[1].type === T_IDENTIFIER;
+        if (is_var1) if (vars[args[0].value] === undefined) return this.log("command_svstr error. (2)\n"), false;
+        if (is_var2) if (vars[args[1].value] === undefined) return this.log("command_svstr error. (3)\n"), false;
+
+        return this.command_vstr([args[+!(vars.iv_compare<0)]]);
     }
 
     command_vstr(args) {
@@ -407,6 +453,7 @@ class CMDS {
                     }
                     ntokens.pop();
                     let ntree = this.parser(ntokens);
+                    if (!ntree) return false;
                     i--;
 
                     command.args.push({type:T_VSTR,value:ntree});
@@ -492,18 +539,18 @@ class CMDS {
                 let string = "";
                 for (i++; i < L && (buffer[i] !== 34 || backslash); i++)
                     string += backslash && buffer[i] === 110 ? "\n" : (backslash = buffer[i] === 92) ? "" : str[i];
-                
+
                 tokens.push({type:TT_STRING,value:string});
                 continue;
             }
 
             if (curr > 47 && curr < 58 || curr === 45 || curr === 46) { // NUMBER
-                
+
                 let sign = false;
                 let point = curr === 46;
                 let string = "";
                 for (; i < L && (buffer[i] > 47 && buffer[i] < 58 || buffer[i] === 45 || buffer[i] === 46); i++) {
-                    
+
                     if (buffer[i] === 45 && sign) return console.log("lexer error number sign"), false;
                     sign ||= curr === 45;
 
@@ -513,7 +560,6 @@ class CMDS {
                     string += str[i];
                 }
                 i--;
-                console.log(string, point);
 
                 tokens.push({type:TT_NUMBER,value:string});
                 continue;
@@ -532,27 +578,27 @@ DOMClear = document.getElementById("clear");
 
 const cmds = new CMDS(DOMConsole);
 
-DOMPrompt.value = `set vala 16384
-set valb 4
+DOMPrompt.value = `set v_a 1234
+set v_b 5
 
-set divr vala
-set divq 0
+set d_r v_a
+set d_q 0
 
-set comp 0
 set loop {
- subtract divr divr valb
- subtract comp divr valb
- increment divq
- pvstr comp loop {
-  subtract comp divr valb
-  zvstr comp {
-   subtract divr divr valb
-   increment divq
-  }
- }
+ subtract d_r d_r v_b
+ compare d_r v_b
+ increment d_q
+ pvstr loop
 }
 vstr loop
-echo vala"/"valb"="divq" (+"divr")"`;
+
+compare d_r v_b
+zvstr {
+ subtract d_r d_r v_b
+ increment d_q
+}
+
+echo v_a"/"v_b" = "d_q" (+"d_r")"`;
 DOMExecute.addEventListener("click", async e=>{
 
     DOMExecute.setAttribute("disabled", true);
