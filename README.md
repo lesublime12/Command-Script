@@ -1,35 +1,44 @@
 # Command Script (CSC)
-Scripting language inspired by CoD WaW commands.
+Scripting language inspired by Quake 3 Arena commands.
 
 ## Commands
 |      Name     | Description |
 | ------------- | ----------- |
-|         bind | key |
-|       unbind | key |
-|    unbindall | key |
-|       prompt | input |
+|         bind | key TODO |
+|       unbind | key TODO |
+|    unbindall | key TODO |
+|       prompt | input TODO |
 |          set | variable |
-| setvartotime | variable |
-|        unset | variable |
+|         setd | variable TODO (set default) |
+|         setc | variable TODO (set constant) |
+|         setp | variable TODO (set protected, apply after protect command ran) |
+| setvartotime | variable TODO |
+|        reset | variable TODO (reset to default, from setd) |
+|        unset | variable TODO |
 |    increment | math |
 |          add | math |
 |     subtract | math |
 |     multiply | math |
-|        pvstr | condition |
-|        zvstr | condition |
-|        nvstr | condition |
+|        gvstr | condition |
+|       gevstr | condition |
+|        evstr | condition |
+|       levstr | condition |
+|        lvstr | condition |
+|       nevstr | condition TODO |
 |         vstr | function-like |
-|       toggle | variable |
-|      protect | interpret | (vars cannot be overwritten by program after protect run, etc)
-|      cmdlist | output |
-|      varlist | output |
+|       toggle | variable TODO |
+|      protect | interpret TODO |
+|      cmdlist | output TODO |
+|      varlist | output TODO |
 |         wait | wait |
 |         echo | output |
-|        clear | output |
+|        clear | output TODO |
 
 ## Variables
-|   Name   | Description |
-| -------- | ----------- |
-|  iv_time | epoch |
-| iv_error | error code |
-|  iv_mode | interpret mode (protected/user) |
+|    Name    | Description |
+| ---------- | ----------- |
+| iv_time    | epoch |
+| iv_error   | error code |
+| iv_mode    | interpret mode (protected/user) |
+| iv_compare | compare |
+| iv_return  | vstr return value |
