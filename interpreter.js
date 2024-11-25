@@ -10,44 +10,18 @@
  *   Parser:
  *    TODO Precise and formated errors.
  *   Lexer:
- *      TODO Literal byte numbers : 21h (0x33) -> '!'
- *      TODO Literal hexadecimal numbers : 0x33
- *      TODO Comments  : # this is a comment
+ *    TODO Precise and formated errors.
+ *    TODO Literal byte numbers : 21h (0x33) -> '!'
+ *    TODO Literal hexadecimal numbers : 0x33
+ *    TODO Comments : # this is a comment
  */
 
 class CMDS {
 
     constructor(DOMConsole) {
 
-        this.commands = {
-                  "set": (...a)=>this.command_set(...a), // set [var] [var/vstr/str/num]
-            "increment": (...a)=>this.command_increment(...a), // inc [var]
-                  "add": (...a)=>this.command_add(...a), // add [var] [var] [var/num]
-             "subtract": (...a)=>this.command_subtract(...a), // sub [var] [var] [var/num]
-             "multiply": (...a)=>this.command_multiply(...a), // mul [var] [var] [var/num]
-              "compare": (...a)=>this.command_compare(...a), // compare [var] [var/num]
-                "pvstr": (...a)=>this.command_pvstr(...a), // pvstr [var] [var/vstr] [var/vstr/-] | variable positive vstr
-               "pzvstr": (...a)=>this.command_pzvstr(...a), // pzvstr [var] [var/vstr] [var/vstr/-] | variable positive or zero vstr
-                "zvstr": (...a)=>this.command_zvstr(...a), // zvstr [var] [var/vstr] [var/vstr/-] | variable zero vstr
-               "szvstr": (...a)=>this.command_szvstr(...a), // szvstr [var] [var/vstr] [var/vstr/-] | variable negative or zero vstr
-                "svstr": (...a)=>this.command_svstr(...a), // svstr [var] [var/vstr] [var/vstr/-] | variable negative vstr
-                 "vstr": (...a)=>this.command_vstr(...a), // vstr [var/vstr]...
-                 "wait": (...a)=>this.command_wait(...a), // wait [num] | wait milliseconds
-                 "echo": (...a)=>this.command_echo(...a),  // echo [var/str/num]...
-                "clear": (...a)=>this.command_clear(...a)  // clear
-        }
-
-        this.running = false;
-        this.cmd_stack = [];
-        this.variables = {};
-        this.DOMConsole = DOMConsole;
-
-        this.variables.iv_compare = 0;
-
         this.enum = {};
-        this.enum.commands = Object.fromEntries(Object.keys(this.commands).map(v=>[v,1]));
-        this.enum.interpreter_variables = Object.fromEntries(Object.keys(this.variables).map(v=>[v,1]));
-
+		
         this.enum.token_types = {};
         this.enum.token_types.command = 1,
         this.enum.token_types.identifier = 2,
@@ -63,6 +37,41 @@ class CMDS {
         this.enum.parse_types.vstr = 2,
         this.enum.parse_types.string = 3,
         this.enum.parse_types.number = 4;
+		
+        let T_IDENTIFIER = this.enum.parse_types.identifier,
+            T_VSTR = this.enum.parse_types.vstr,
+            T_STRING = this.enum.parse_types.string,
+            T_NUMBER = this.enum.parse_types.number;
+
+        this.commands = {
+                  "set": {func:(...a)=>this.command_set	        (...a), args:[2, 2, [[T_IDENTIFIER],[T_IDENTIFIER,T_VSTR,T_STRING,T_NUMBER]]]}, // set [var] [var/vstr/str/num]
+         "setvartotime": {func:(...a)=>this.command_setvartotime(...a), args:[1, 1, [[T_IDENTIFIER]]]}, // setvartotime [var]
+            "increment": {func:(...a)=>this.command_increment   (...a), args:[1, 1, [[T_IDENTIFIER]]]}, // inc [var]
+                  "add": {func:(...a)=>this.command_add         (...a), args:[3, 3, [[T_IDENTIFIER],[T_IDENTIFIER],[T_IDENTIFIER,T_NUMBER]]]}, // add [var] [var] [var/num]
+             "subtract": {func:(...a)=>this.command_subtract    (...a), args:[3, 3, [[T_IDENTIFIER],[T_IDENTIFIER],[T_IDENTIFIER,T_NUMBER]]]}, // sub [var] [var] [var/num]
+             "multiply": {func:(...a)=>this.command_multiply    (...a), args:[3, 3, [[T_IDENTIFIER],[T_IDENTIFIER],[T_IDENTIFIER,T_NUMBER]]]}, // mul [var] [var] [var/num]
+              "compare": {func:(...a)=>this.command_compare     (...a), args:[2, 2, [[T_IDENTIFIER],[T_IDENTIFIER,T_NUMBER]]]}, // compare [var] [var/num]
+                "gvstr": {func:(...a)=>this.command_gvstr       (...a), args:[1, 2, [[T_IDENTIFIER,T_VSTR],[T_IDENTIFIER,T_VSTR]]]}, // gvstr[var] [var/vstr] [var/vstr/-] | variable positive vstr
+               "gevstr": {func:(...a)=>this.command_gevstr      (...a), args:[1, 2, [[T_IDENTIFIER,T_VSTR],[T_IDENTIFIER,T_VSTR]]]}, // gevstr [var] [var/vstr] [var/vstr/-] | variable positive or zero vstr
+                "evstr": {func:(...a)=>this.command_evstr       (...a), args:[1, 2, [[T_IDENTIFIER,T_VSTR],[T_IDENTIFIER,T_VSTR]]]}, // evstr [var] [var/vstr] [var/vstr/-] | variable zero vstr
+               "levstr": {func:(...a)=>this.command_levstr      (...a), args:[1, 2, [[T_IDENTIFIER,T_VSTR],[T_IDENTIFIER,T_VSTR]]]}, // levstr [var] [var/vstr] [var/vstr/-] | variable negative or zero vstr
+                "lvstr": {func:(...a)=>this.command_lvstr       (...a), args:[1, 2, [[T_IDENTIFIER,T_VSTR],[T_IDENTIFIER,T_VSTR]]]}, // lvstr [var] [var/vstr] [var/vstr/-] | variable negative vstr
+               "nevstr": {func:(...a)=>this.command_nevstr      (...a), args:[1, 2, [[T_IDENTIFIER,T_VSTR],[T_IDENTIFIER,T_VSTR]]]}, // nevstr [var] [var/vstr] [var/vstr/-] | variable zero vstr
+                 "vstr": {func:(...a)=>this.command_vstr        (...a), args:0}, // vstr [var/vstr]...
+                 "wait": {func:(...a)=>this.command_wait        (...a), args:[1, 1, [[T_NUMBER]]]}, // wait [num] | wait milliseconds
+                 "echo": {func:(...a)=>this.command_echo        (...a), args:0}, // echo [var/str/num]...
+                "clear": {func:(...a)=>this.command_clear       (...a), args:0}  // clear
+        };
+
+        this.running = false;
+        this.cmd_stack = [];
+        this.variables = {};
+        this.DOMConsole = DOMConsole;
+
+        this.variables.iv_compare = 0;
+
+        this.enum.commands = Object.fromEntries(Object.keys(this.commands).map(v=>[v,1]));
+        this.enum.interpreter_variables = Object.fromEntries(Object.keys(this.variables).map(v=>[v,1]));
     }
 
     reset() {
@@ -92,17 +101,11 @@ class CMDS {
 
     command_set(args) {
 
-        let T_IDENTIFIER = this.enum.parse_types.identifier,
-            T_VSTR       = this.enum.parse_types.vstr,
-            T_STRING     = this.enum.parse_types.string,
-            T_NUMBER     = this.enum.parse_types.number;
-        if (this.check_arguments(args, 2, 2, [[T_IDENTIFIER],[T_IDENTIFIER,T_VSTR,T_STRING,T_NUMBER]])) return this.log("command_set error. (1)\n"), false;
-
         let vars = this.variables;
 
         let val1 = args[0].value,
             val2 = args[1].value,
-            is_var2 = args[1].type === T_IDENTIFIER;
+            is_var2 = args[1].type === this.enum.parse_types.identifier;
 
         if (is_var2 && vars[val2] === undefined) return this.log("command_set error. (2)\n"), false;
 
@@ -111,10 +114,18 @@ class CMDS {
         return true;
     }
 
-    command_increment(args) {
+    command_setvartotime(args) {
 
-        let T_IDENTIFIER = this.enum.parse_types.identifier;
-        if (this.check_arguments(args, 1, 1, [[T_IDENTIFIER]])) return this.log("command_set error. (1)\n"), false;
+        let vars = this.variables;
+
+        if (vars[args[0].type] === undefined) return this.log("command_set error. (2)\n"), false;
+
+        vars[args[0].value] = Date.now();
+
+        return true;
+    }
+
+    command_increment(args) {
 
         let vars = this.variables;
 
@@ -128,16 +139,12 @@ class CMDS {
 
     command_add(args) {
 
-        let T_IDENTIFIER = this.enum.parse_types.identifier,
-            T_NUMBER     = this.enum.parse_types.number;
-        if (this.check_arguments(args, 3, 3, [[T_IDENTIFIER],[T_IDENTIFIER],[T_IDENTIFIER,T_NUMBER]])) return this.log("command_add error. (1)\n"), false;
-
         let vars = this.variables;
 
         let val1 = args[0].value,
             val2 = args[1].value,
             val3 = args[2].value,
-            is_var3 = args[2].type === T_IDENTIFIER;
+            is_var3 = args[2].type === this.enum.parse_types.identifier;
 
         if (           vars[val1] === undefined) return this.log("command_add error. (2)\n"), false;
         if (           vars[val2] === undefined) return this.log("command_add error. (3)\n"), false;
@@ -150,16 +157,12 @@ class CMDS {
 
     command_subtract(args) {
 
-        let T_IDENTIFIER = this.enum.parse_types.identifier,
-            T_NUMBER     = this.enum.parse_types.number;
-        if (this.check_arguments(args, 3, 3, [[T_IDENTIFIER],[T_IDENTIFIER],[T_IDENTIFIER,T_NUMBER]])) return this.log("command_subtract error. (1)\n"), false;
-
         let vars = this.variables;
 
         let val1 = args[0].value,
             val2 = args[1].value,
             val3 = args[2].value,
-            is_var3 = args[2].type === T_IDENTIFIER;
+            is_var3 = args[2].type === this.enum.parse_types.identifier;
 
         if (           vars[val1] === undefined) return this.log("command_subtract error. (2)\n"), false;
         if (           vars[val2] === undefined) return this.log("command_subtract error. (3)\n"), false;
@@ -174,7 +177,6 @@ class CMDS {
 
         let T_IDENTIFIER = this.enum.parse_types.identifier,
             T_NUMBER     = this.enum.parse_types.number;
-        if (this.check_arguments(args, 3, 3, [[T_IDENTIFIER],[T_IDENTIFIER],[T_IDENTIFIER,T_NUMBER]])) return this.log("command_multiply error. (1)\n"), false;
 
         let vars = this.variables;
 
@@ -194,15 +196,11 @@ class CMDS {
 
     command_compare(args) {
 
-        let T_IDENTIFIER = this.enum.parse_types.identifier,
-            T_NUMBER     = this.enum.parse_types.number;
-        if (this.check_arguments(args, 2, 2, [[T_IDENTIFIER],[T_IDENTIFIER,T_NUMBER]])) return this.log("command_compare error. (1)\n"), false;
-
         let vars = this.variables;
 
         let val1 = args[0].value,
             val2 = args[1].value,
-            is_var2 = args[1].type === T_IDENTIFIER;
+            is_var2 = args[1].type === this.enum.parse_types.identifier;
 
         if (           vars[val1] === undefined) return this.log("command_compare error. (2)\n"), false;
         if (is_var2 && vars[val2] === undefined) return this.log("command_compare error. (3)\n"), false;
@@ -212,89 +210,101 @@ class CMDS {
         return true;
     }
 
-    command_pvstr(args) {
+    command_gvstr(args) {
 
         let T_IDENTIFIER = this.enum.parse_types.identifier,
             T_VSTR       = this.enum.parse_types.vstr;
-        if (this.check_arguments(args, 1, 2, [[T_IDENTIFIER,T_VSTR],[T_IDENTIFIER,T_VSTR]])) return this.log("command_pvstr error. (1)\n"), false;
         if (!args[1]) args[1] = {type:T_VSTR,value:[]};
 
         let vars = this.variables;
 
         let is_var1 = args[0].type === T_IDENTIFIER,
             is_var2 = args[1].type === T_IDENTIFIER;
-        if (is_var1) if (vars[args[0].value] === undefined) return this.log("command_pvstr error. (2)\n"), false;
-        if (is_var2) if (vars[args[1].value] === undefined) return this.log("command_pvstr error. (3)\n"), false;
+        if (is_var1) if (vars[args[0].value] === undefined) return this.log("command_gvstr error. (2)\n"), false;
+        if (is_var2) if (vars[args[1].value] === undefined) return this.log("command_gvstr error. (3)\n"), false;
 
         return this.command_vstr([args[+!(vars.iv_compare>0)]]);
     }
 
-    command_pzvstr(args) {
+    command_gezvstr(args) {
 
         let T_IDENTIFIER = this.enum.parse_types.identifier,
             T_VSTR       = this.enum.parse_types.vstr;
-        if (this.check_arguments(args, 1, 2, [[T_IDENTIFIER,T_VSTR],[T_IDENTIFIER,T_VSTR]])) return this.log("command_pzvstr error. (1)\n"), false;
         if (!args[1]) args[1] = {type:T_VSTR,value:[]};
 
         let vars = this.variables;
 
         let is_var1 = args[0].type === T_IDENTIFIER,
             is_var2 = args[1].type === T_IDENTIFIER;
-        if (is_var1) if (vars[args[0].value] === undefined) return this.log("command_pzvstr error. (2)\n"), false;
-        if (is_var2) if (vars[args[1].value] === undefined) return this.log("command_pzvstr error. (3)\n"), false;
+        if (is_var1) if (vars[args[0].value] === undefined) return this.log("command_gevstr error. (2)\n"), false;
+        if (is_var2) if (vars[args[1].value] === undefined) return this.log("command_gevstr error. (3)\n"), false;
 
         return this.command_vstr([args[+!(vars.iv_compare>=0)]]);
     }
 
-    command_zvstr(args) {
+    command_evstr(args) {
 
         let T_IDENTIFIER = this.enum.parse_types.identifier,
             T_VSTR       = this.enum.parse_types.vstr;
-        if (this.check_arguments(args, 1, 2, [[T_IDENTIFIER,T_VSTR],[T_IDENTIFIER,T_VSTR]])) return this.log("command_zvstr error. (1)\n"), false;
         if (!args[1]) args[1] = {type:T_VSTR,value:[]};
 
         let vars = this.variables;
 
         let is_var1 = args[0].type === T_IDENTIFIER,
             is_var2 = args[1].type === T_IDENTIFIER;
-        if (is_var1) if (vars[args[0].value] === undefined) return this.log("command_zvstr error. (2)\n"), false;
-        if (is_var2) if (vars[args[1].value] === undefined) return this.log("command_zvstr error. (3)\n"), false;
+        if (is_var1) if (vars[args[0].value] === undefined) return this.log("command_evstr error. (2)\n"), false;
+        if (is_var2) if (vars[args[1].value] === undefined) return this.log("command_evstr error. (3)\n"), false;
 
         return this.command_vstr([args[+!(vars.iv_compare==0)]]);
     }
 
-    command_szvstr(args) {
+    command_levstr(args) {
 
         let T_IDENTIFIER = this.enum.parse_types.identifier,
             T_VSTR       = this.enum.parse_types.vstr;
-        if (this.check_arguments(args, 1, 2, [[T_IDENTIFIER,T_VSTR],[T_IDENTIFIER,T_VSTR]])) return this.log("command_szvstr error. (1)\n"), false;
         if (!args[1]) args[1] = {type:T_VSTR,value:[]};
 
         let vars = this.variables;
 
         let is_var1 = args[0].type === T_IDENTIFIER,
             is_var2 = args[1].type === T_IDENTIFIER;
-        if (is_var1) if (vars[args[0].value] === undefined) return this.log("command_szvstr error. (2)\n"), false;
-        if (is_var2) if (vars[args[1].value] === undefined) return this.log("command_szvstr error. (3)\n"), false;
+        if (is_var1) if (vars[args[0].value] === undefined) return this.log("command_levstr error. (2)\n"), false;
+        if (is_var2) if (vars[args[1].value] === undefined) return this.log("command_levstr error. (3)\n"), false;
 
         return this.command_vstr([args[+!(vars.iv_compare<=0)]]);
     }
 
-    command_svstr(args) {
+    command_lvstr(args) {
 
         let T_IDENTIFIER = this.enum.parse_types.identifier,
             T_VSTR       = this.enum.parse_types.vstr;
-        if (this.check_arguments(args, 1, 2, [[T_IDENTIFIER,T_VSTR],[T_IDENTIFIER,T_VSTR]])) return this.log("command_svstr error. (1)\n"), false;
+        //if (this.check_arguments(args, 1, 2, [[T_IDENTIFIER,T_VSTR],[T_IDENTIFIER,T_VSTR]])) return this.log("command_lvstr error. (1)\n"), false;
         if (!args[1]) args[1] = {type:T_VSTR,value:[]};
 
         let vars = this.variables;
 
         let is_var1 = args[0].type === T_IDENTIFIER,
             is_var2 = args[1].type === T_IDENTIFIER;
-        if (is_var1) if (vars[args[0].value] === undefined) return this.log("command_svstr error. (2)\n"), false;
-        if (is_var2) if (vars[args[1].value] === undefined) return this.log("command_svstr error. (3)\n"), false;
+        if (is_var1) if (vars[args[0].value] === undefined) return this.log("command_lvstr error. (2)\n"), false;
+        if (is_var2) if (vars[args[1].value] === undefined) return this.log("command_lvstr error. (3)\n"), false;
 
         return this.command_vstr([args[+!(vars.iv_compare<0)]]);
+    }
+
+    command_nevstr(args) {
+
+        let T_IDENTIFIER = this.enum.parse_types.identifier,
+            T_VSTR       = this.enum.parse_types.vstr;
+        if (!args[1]) args[1] = {type:T_VSTR,value:[]};
+
+        let vars = this.variables;
+
+        let is_var1 = args[0].type === T_IDENTIFIER,
+            is_var2 = args[1].type === T_IDENTIFIER;
+        if (is_var1) if (vars[args[0].value] === undefined) return this.log("command_nevstr error. (2)\n"), false;
+        if (is_var2) if (vars[args[1].value] === undefined) return this.log("command_nevstr error. (3)\n"), false;
+
+        return this.command_vstr([args[+!(vars.iv_compare!=0)]]);
     }
 
     command_vstr(args) {
@@ -325,9 +335,7 @@ class CMDS {
     }
 
     async command_wait(args) {
-
-        if (args.length < 1) return this.log("command_wait error. (1)\n"), false;
-
+		
         let arg = args[0];
         if (arg.type !== this.enum.parse_types.number) return this.log("command_wait error. (2)\n"), false;
 
@@ -391,8 +399,8 @@ class CMDS {
 
         this.running = true;
 
-        let start = Date.now();
-        let iterations = 1;
+        let start = Date.now(),
+			iterations = 1;
         for (; this.running; iterations++) {
 
             let curr = this.cmd_stack.pop();
@@ -401,7 +409,7 @@ class CMDS {
                 break;
             }
 
-            this.running = !((await this.commands[curr.name](curr.args)) === false);
+            this.running = !((await this.commands[curr.name].func(curr.args)) === false);
         }
 
         let end = Date.now();
@@ -430,7 +438,7 @@ class CMDS {
 
             let curr = tokens[i];
             if (curr.type === TT_EOL) continue;
-            if (curr.type !== TT_COMMAND) return console.log("parser_error", curr), false;
+            if (curr.type !== TT_COMMAND) return console.log("parser_error (1)", curr), false;
 
             let command = {name:curr.value, args:[]};
             for (i++; i < L && tokens[i].type !== TT_EOL; i++) {
@@ -472,6 +480,8 @@ class CMDS {
                     continue;
                 }
             }
+			
+			if (this.commands[command.name].args) if (this.check_arguments(command.args, ...this.commands[command.name].args)) return ;
 
             tree.push(command);
         }
@@ -588,12 +598,12 @@ set loop {
  subtract d_r d_r v_b
  compare d_r v_b
  increment d_q
- pvstr loop
+ gvstr loop
 }
 vstr loop
 
 compare d_r v_b
-zvstr {
+evstr {
  subtract d_r d_r v_b
  increment d_q
 }
