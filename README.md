@@ -12,7 +12,7 @@ Scripting language inspired by Quake 3 Arena commands.
 |         setd | variable TODO (set default) |
 |         setc | variable TODO (set constant) |
 |         setp | variable TODO (set protected, apply after protect command ran) |
-| setvartotime | variable TODO |
+| setvartotime | variable TODO (set var to current epoch) |
 |        reset | variable TODO (reset to default, from setd) |
 |        unset | variable TODO |
 |    increment | math |
@@ -24,7 +24,7 @@ Scripting language inspired by Quake 3 Arena commands.
 |        evstr | condition |
 |       levstr | condition |
 |        lvstr | condition |
-|       nevstr | condition TODO |
+|       nevstr | condition |
 |         vstr | function-like |
 |       toggle | variable TODO |
 |      protect | interpret TODO |
